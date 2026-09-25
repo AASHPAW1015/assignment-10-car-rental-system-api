@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Car Rental</title>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="app.js"></script>
+  </head>
+  <body>
+    <h1>Car Rental and Fleet Booking</h1>
+
+    <div id="nav"></div>
+
+    <br />
+
+    <div>
+      <label for="category">Category : </label>
+      <select id="category">
+        <option value="">All</option>
+        <option value="Sedan">Sedan</option>
+        <option value="SUV">SUV</option>
+        <option value="Luxury">Luxury</option>
+        <option value="Hatchback">Hatchback</option>
+        <option value="Electric">Electric</option>
+      </select>
+
+      <label for="status">Status : </label>
+      <select id="status">
+        <option value="">All</option>
+        <option value="available">Available</option>
+        <option value="rented">Rented</option>
+        <option value="maintenance">Maintenance</option>
+      </select>
+
+      <label for="start_date">Free from : </label>
+      <input type="date" id="start_date" />
+      <label for="end_date">to : </label>
+      <input type="date" id="end_date" />
+
+      <button onclick="loadVehicles()">SEARCH</button>
+      <button onclick="clearFilter()">SHOW ALL</button>
+      <span id="count"></span>
+    </div>
+
+    <br />
+
+    <table border="1">
+      <thead>
+        <tr>
+          <th>Vehicle</th>
+          <th>Year</th>
+          <th>Category</th>
+          <th>Fuel</th>
+          <th>Seats</th>
+          <th>Daily Rate</th>
+          <th>Status</th>
+          <th>ACTION</th>
+        </tr>
+      </thead>
+      <tbody id="vehicle-rows"></tbody>
+    </table>
+
+    <script>
+      const user = getUser();
+
+      function actionCell(vehicle) {
+        const td = document.createElement("td");
+        const start = document.getElementById("start_date").value;
+        const end = document.getElementById("end_date").value;
+        const dates = start && end ? `&start_date=${start}&end_date=${end}` : "";
+
+        td.appendChild(
+          makeButton("VIEW / BOOK", () => {
+            location.href = `vehicle.html?id=${vehicle.id}${dates}`;
+          }),
+        );
+
+        if (isAdmin(user)) {
+          td.appendChild(
+            makeButton("EDIT", () => {
+              location.href = `vehicle-form.html?id=${vehicle.id}`;
+            }),
+          );
+          td.appendChild(
+            makeButton("DELETE", () => {
+              Swal.fire({
+                icon: "warning",
+                title: `Delete ${vehicle.brand} ${vehicle.model}?`,
+                showCancelButton: true,
+                confirmButtonText: "Delete",
+              }).then((result) => {
+                if (result.isConfirmed) {
+                  runAction(`/vehicles/${vehicle.id}`, "DELETE", null, "vehicle deleted", loadVehicles);
+                }
+              });
+            }),
+          );
+        }
+        return td;
+      }
+
+      function loadVehicles() {
+        const params = new URLSearchParams();
+        ["category", "status", "start_date", "end_date"].forEach((field) => {
+          const value = document.getElementById(field).value;
+          if (value) params.set(field, value);
+        });
+
+        callApi(`/vehicles?${params}`)
+          .then(({ response, data }) => {
+            console.log(data);
+            if (response.status !== 200) {
+              showError(data.message || "could not load vehicles!");
+              return;
+            }
+
+            const dated = params.has("start_date") ? " free for those dates" : "";
+            document.getElementById("count").textContent = `${data.count} vehicle(s)${dated}`;
+            const rows = document.getElementById("vehicle-rows");
+            rows.innerHTML = "";
+
+            if (data.count === 0) {
+              rows.innerHTML = `<tr><td colspan="8">no vehicles found</td></tr>`;
+            }
+
+            data.vehicles.forEach((vehicle) => {
+              const tr = document.createElement("tr");
+              addCells(tr, [
+                `${vehicle.brand} ${vehicle.model}`,
+                vehicle.year,
+                vehicle.category,
+                vehicle.fuel_type,
+                vehicle.seating_capacity,
+                rupees(vehicle.daily_rate),
+                vehicle.status,
+              ]);
+              tr.appendChild(actionCell(vehicle));
+              rows.appendChild(tr);
+            });
+          })
+          .catch((error) => {
+            console.log(error);
+            showError("could not reach the server!");
+          });
+      }
+
+      function clearFilter() {
+        ["category", "status", "start_date", "end_date"].forEach((field) => {
+          document.getElementById(field).value = "";
+        });
+        loadVehicles();
+      }
+
+      document.getElementById("start_date").min = todayString();
+      document.getElementById("end_date").min = todayString();
+      renderNav();
+      loadVehicles();
+    </script>
+  </body>
+</html>

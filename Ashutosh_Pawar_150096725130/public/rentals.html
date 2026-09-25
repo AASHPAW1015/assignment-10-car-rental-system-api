@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>All Rentals</title>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="app.js"></script>
+  </head>
+  <body>
+    <h1>All Rentals</h1>
+
+    <div id="nav"></div>
+
+    <br />
+
+    <div>
+      <label for="status">Status : </label>
+      <select id="status" onchange="loadRentals()">
+        <option value="">All</option>
+        <option value="booked">Booked</option>
+        <option value="active">Active</option>
+        <option value="completed">Completed</option>
+        <option value="cancelled">Cancelled</option>
+      </select>
+      <span id="count"></span>
+    </div>
+
+    <br />
+
+    <table border="1">
+      <thead>
+        <tr>
+          <th>Vehicle</th>
+          <th>Customer</th>
+          <th>From</th>
+          <th>To</th>
+          <th>Total Cost</th>
+          <th>Status</th>
+          <th>ACTION</th>
+        </tr>
+      </thead>
+      <tbody id="rental-rows"></tbody>
+    </table>
+
+    <script>
+      function loadRentals() {
+        const status = document.getElementById("status").value;
+
+        callApi(`/rentals${status ? `?status=${status}` : ""}`)
+          .then(({ response, data }) => {
+            console.log(data);
+            if (handleUnauthorized(response, data)) return;
+            if (response.status !== 200) {
+              showError(data.message || "could not load rentals!");
+              return;
+            }
+
+            document.getElementById("count").textContent = `${data.count} rental(s), revenue ${rupees(data.total_spent)}`;
+            const rows = document.getElementById("rental-rows");
+            rows.innerHTML = "";
+
+            if (data.count === 0) {
+              rows.innerHTML = `<tr><td colspan="7">no rentals</td></tr>`;
+            }
+
+            data.rentals.forEach((rental) => {
+              const tr = document.createElement("tr");
+              addCells(tr, [
+                rental.vehicle ? `${rental.vehicle.brand} ${rental.vehicle.model} (${rental.vehicle.status})` : "-",
+                `${rental.customer_name} (${rental.customer_email})`,
+                rental.start_date,
+                rental.end_date,
+                rupees(rental.total_cost),
+                rental.status,
+              ]);
+
+              const td = document.createElement("td");
+              const path = `/rentals/${rental.id}`;
+              if (rental.status === "booked") {
+                td.appendChild(
+                  makeButton("HAND OVER", () => runAction(`${path}/start`, "PATCH", null, "vehicle handed over", loadRentals)),
+                );
+                td.appendChild(
+                  makeButton("CANCEL", () => runAction(`${path}/cancel`, "PATCH", null, "rental cancelled", loadRentals)),
+                );
+              }
+              if (rental.status === "active") {
+                td.appendChild(
+                  makeButton("MARK RETURNED", () =>
+                    runAction(`${path}/complete`, "PATCH", null, "vehicle returned", loadRentals),
+                  ),
+                );
+              }
+              tr.appendChild(td);
+              rows.appendChild(tr);
+            });
+          })
+          .catch((error) => {
+            console.log(error);
+            showError("could not reach the server!");
+          });
+      }
+
+      if (requireRole("admin")) {
+        renderNav();
+        loadRentals();
+      }
+    </script>
+  </body>
+</html>

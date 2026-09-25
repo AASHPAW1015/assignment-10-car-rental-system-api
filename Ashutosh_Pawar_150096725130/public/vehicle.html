@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Vehicle</title>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="app.js"></script>
+  </head>
+  <body>
+    <h1 id="heading">Vehicle</h1>
+
+    <div id="nav"></div>
+
+    <p>Category : <b id="category">-</b></p>
+    <p>Year : <b id="year">-</b></p>
+    <p>Fuel : <b id="fuel">-</b></p>
+    <p>Seats : <b id="seats">-</b></p>
+    <p>Daily Rate : <b id="rate">-</b></p>
+    <p>Status : <b id="status">-</b></p>
+
+    <h3>Book this vehicle</h3>
+
+    <div id="book-box">
+      <div>
+        <label for="start_date">Start Date : </label>
+        <input type="date" id="start_date" onchange="getQuote()" />
+      </div>
+
+      <div>
+        <label for="end_date">End Date : </label>
+        <input type="date" id="end_date" onchange="getQuote()" />
+      </div>
+
+      <div>
+        <label for="customer_name">Name : </label>
+        <input type="text" id="customer_name" />
+      </div>
+
+      <div>
+        <label for="customer_email">Email : </label>
+        <input type="email" id="customer_email" />
+      </div>
+
+      <p id="quote">pick dates to see the price</p>
+
+      <button onclick="book()">BOOK</button>
+    </div>
+
+    <p id="login-note" hidden>please <a href="login.html">login</a> to book</p>
+
+    <h3>Rental History</h3>
+
+    <table border="1">
+      <thead>
+        <tr>
+          <th>From</th>
+          <th>To</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody id="history-rows"></tbody>
+    </table>
+
+    <script>
+      const params = new URLSearchParams(location.search);
+      const vehicleId = params.get("id");
+      const user = getUser();
+
+      function loadVehicle() {
+        callApi(`/vehicles/${vehicleId}`)
+          .then(({ response, data }) => {
+            console.log(data);
+            if (response.status !== 200) {
+              showError(data.message || "could not load vehicle!");
+              return;
+            }
+
+            const vehicle = data.vehicle;
+            document.getElementById("heading").textContent = `${vehicle.brand} ${vehicle.model}`;
+            document.getElementById("category").textContent = vehicle.category;
+            document.getElementById("year").textContent = vehicle.year;
+            document.getElementById("fuel").textContent = vehicle.fuel_type;
+            document.getElementById("seats").textContent = vehicle.seating_capacity;
+            document.getElementById("rate").textContent = `${rupees(vehicle.daily_rate)} per day`;
+            document.getElementById("status").textContent = vehicle.status;
+
+            const rows = document.getElementById("history-rows");
+            rows.innerHTML = "";
+            if (data.rentals.length === 0) {
+              rows.innerHTML = `<tr><td colspan="3">no rentals yet</td></tr>`;
+            }
+            data.rentals.forEach((rental) => {
+              const tr = document.createElement("tr");
+              addCells(tr, [rental.start_date, rental.end_date, rental.status]);
+              rows.appendChild(tr);
+            });
+          })
+          .catch((error) => {
+            console.log(error);
+            showError("could not reach the server!");
+          });
+      }
+
+      function getQuote() {
+        const start = document.getElementById("start_date").value;
+        const end = document.getElementById("end_date").value;
+        const quote = document.getElementById("quote");
+        if (!start || !end) return;
+
+        callApi(`/vehicles/${vehicleId}/quote?start_date=${start}&end_date=${end}`)
+          .then(({ response, data }) => {
+            if (response.status !== 200) {
+              quote.textContent = data.message;
+              return;
+            }
+            let text = `${data.days} day(s) x ${rupees(data.daily_rate)} = ${rupees(data.total_cost)}`;
+            if (!data.available) {
+              const taken = data.conflicts.map((c) => `${c.start_date} to ${c.end_date}`).join(", ");
+              text += taken ? ` - NOT available, already booked ${taken}` : " - NOT available right now";
+            }
+            quote.textContent = text;
+          })
+          .catch((error) => console.log(error));
+      }
+
+      function book() {
+        const body = {
+          vehicle_id: Number(vehicleId),
+          start_date: document.getElementById("start_date").value,
+          end_date: document.getElementById("end_date").value,
+          customer_name: document.getElementById("customer_name").value,
+          customer_email: document.getElementById("customer_email").value,
+        };
+
+        callApi("/rentals", "POST", body)
+          .then(({ response, data }) => {
+            console.log(data);
+            if (handleUnauthorized(response, data)) return;
+
+            if (response.status === 201) {
+              showSuccess(`booked for ${data.billing.days} day(s), total ${rupees(data.billing.total_cost)}`).then(() => {
+                location.href = "my-bookings.html";
+              });
+            } else {
+              showError(data.message || "could not book!");
+            }
+          })
+          .catch((error) => {
+            console.log(error);
+            showError("could not reach the server!");
+          });
+      }
+
+      ["start_date", "end_date"].forEach((field) => {
+        const input = document.getElementById(field);
+        input.min = todayString();
+        if (params.get(field)) input.value = params.get(field);
+      });
+
+      if (user) {
+        document.getElementById("customer_name").value = user.name;
+        document.getElementById("customer_email").value = user.email;
+      } else {
+        document.getElementById("book-box").hidden = true;
+        document.getElementById("login-note").hidden = false;
+      }
+
+      renderNav();
+      loadVehicle();
+      getQuote();
+    </script>
+  </body>
+</html>

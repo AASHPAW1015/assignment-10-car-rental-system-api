@@ -1,0 +1,143 @@
+@base = http://localhost:3000/api
+@customerToken = PASTE_CUSTOMER_TOKEN
+@otherToken = PASTE_SECOND_CUSTOMER_TOKEN
+@adminToken = PASTE_ADMIN_TOKEN
+@vehicleId = 1
+@rentalId = 1
+
+### Register a customer
+POST {{base}}/auth/register
+Content-Type: application/json
+
+{
+  "name": "David",
+  "email": "driver@travel.com",
+  "password": "mypassword123"
+}
+
+### Register the admin, then in the SQL editor:
+### update profiles set role = 'admin' where email = 'admin@travel.com';
+POST {{base}}/auth/register
+Content-Type: application/json
+
+{
+  "name": "Fleet Admin",
+  "email": "admin@travel.com",
+  "password": "mypassword123"
+}
+
+### Login (copy the token into the variables above)
+POST {{base}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "driver@travel.com",
+  "password": "mypassword123"
+}
+
+### Profile
+GET {{base}}/auth/profile
+Authorization: Bearer {{customerToken}}
+
+### Add vehicle as customer -> 403
+POST {{base}}/vehicles
+Authorization: Bearer {{customerToken}}
+Content-Type: application/json
+
+{
+  "brand": "Tesla",
+  "model": "Model 3",
+  "year": 2024,
+  "category": "Electric",
+  "daily_rate": 4500,
+  "fuel_type": "EV",
+  "seating_capacity": 5
+}
+
+### Add vehicle as admin -> 201
+POST {{base}}/vehicles
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "brand": "Tesla",
+  "model": "Model 3",
+  "year": 2024,
+  "category": "Electric",
+  "daily_rate": 4500,
+  "fuel_type": "EV",
+  "seating_capacity": 5
+}
+
+### All vehicles, filters: category, status
+GET {{base}}/vehicles?category=SUV&status=available
+
+### Vehicles free for a date range
+GET {{base}}/vehicles?start_date={{$datetime 'YYYY-MM-DD' 2 d}}&end_date={{$datetime 'YYYY-MM-DD' 3 d}}
+
+### Vehicle details with rental history
+GET {{base}}/vehicles/{{vehicleId}}
+
+### Price quote
+GET {{base}}/vehicles/{{vehicleId}}/quote?start_date={{$datetime 'YYYY-MM-DD'}}&end_date={{$datetime 'YYYY-MM-DD' 4 d}}
+
+### Update rate or status
+PUT {{base}}/vehicles/{{vehicleId}}
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "daily_rate": 4800
+}
+
+### Book today to today+4 (5 days)
+POST {{base}}/rentals
+Authorization: Bearer {{customerToken}}
+Content-Type: application/json
+
+{
+  "vehicle_id": {{vehicleId}},
+  "start_date": "{{$datetime 'YYYY-MM-DD'}}",
+  "end_date": "{{$datetime 'YYYY-MM-DD' 4 d}}",
+  "customer_name": "David",
+  "customer_email": "david@test.com"
+}
+
+### Overlapping booking today+2 to today+6 -> 400 Vehicle already reserved during this timeframe
+POST {{base}}/rentals
+Authorization: Bearer {{otherToken}}
+Content-Type: application/json
+
+{
+  "vehicle_id": {{vehicleId}},
+  "start_date": "{{$datetime 'YYYY-MM-DD' 2 d}}",
+  "end_date": "{{$datetime 'YYYY-MM-DD' 6 d}}"
+}
+
+### My bookings
+GET {{base}}/rentals/my-bookings
+Authorization: Bearer {{customerToken}}
+
+### All rentals (admin)
+GET {{base}}/rentals?status=booked
+Authorization: Bearer {{adminToken}}
+
+### One rental (owner or admin)
+GET {{base}}/rentals/{{rentalId}}
+Authorization: Bearer {{customerToken}}
+
+### Hand over the car (admin) -> vehicle becomes rented
+PATCH {{base}}/rentals/{{rentalId}}/start
+Authorization: Bearer {{adminToken}}
+
+### Car returned (admin) -> vehicle back to available
+PATCH {{base}}/rentals/{{rentalId}}/complete
+Authorization: Bearer {{adminToken}}
+
+### Cancel an upcoming booking
+PATCH {{base}}/rentals/{{rentalId}}/cancel
+Authorization: Bearer {{customerToken}}
+
+### Delete vehicle (admin)
+DELETE {{base}}/vehicles/{{vehicleId}}
+Authorization: Bearer {{adminToken}}

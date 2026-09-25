@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>My Bookings</title>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="app.js"></script>
+  </head>
+  <body>
+    <h1>My Bookings</h1>
+
+    <div id="nav"></div>
+
+    <p>Total spent : <b id="spent">-</b></p>
+
+    <table border="1">
+      <thead>
+        <tr>
+          <th>Vehicle</th>
+          <th>From</th>
+          <th>To</th>
+          <th>Total Cost</th>
+          <th>Booked For</th>
+          <th>Status</th>
+          <th>ACTION</th>
+        </tr>
+      </thead>
+      <tbody id="rental-rows"></tbody>
+    </table>
+
+    <script>
+      function loadBookings() {
+        callApi("/rentals/my-bookings")
+          .then(({ response, data }) => {
+            console.log(data);
+            if (handleUnauthorized(response, data)) return;
+            if (response.status !== 200) {
+              showError(data.message || "could not load bookings!");
+              return;
+            }
+
+            document.getElementById("spent").textContent = rupees(data.total_spent);
+            const rows = document.getElementById("rental-rows");
+            rows.innerHTML = "";
+
+            if (data.count === 0) {
+              rows.innerHTML = `<tr><td colspan="7">no bookings yet</td></tr>`;
+            }
+
+            data.rentals.forEach((rental) => {
+              const tr = document.createElement("tr");
+              addCells(tr, [
+                rental.vehicle ? `${rental.vehicle.brand} ${rental.vehicle.model}` : "-",
+                rental.start_date,
+                rental.end_date,
+                rupees(rental.total_cost),
+                `${rental.customer_name} (${rental.customer_email})`,
+                rental.status,
+              ]);
+              const td = document.createElement("td");
+              if (rental.status === "booked" && rental.start_date >= todayString()) {
+                td.appendChild(
+                  makeButton("CANCEL", () =>
+                    runAction(`/rentals/${rental.id}/cancel`, "PATCH", null, "booking cancelled", loadBookings),
+                  ),
+                );
+              }
+              tr.appendChild(td);
+              rows.appendChild(tr);
+            });
+          })
+          .catch((error) => {
+            console.log(error);
+            showError("could not reach the server!");
+          });
+      }
+
+      if (requireRole("customer", "admin")) {
+        renderNav();
+        loadBookings();
+      }
+    </script>
+  </body>
+</html>

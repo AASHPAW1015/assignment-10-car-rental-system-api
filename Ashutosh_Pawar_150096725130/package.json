@@ -1,0 +1,23 @@
+{
+  "name": "ashutosh_pawar_150096725130",
+  "version": "1.0.0",
+  "description": "Car rental and fleet booking API with Supabase Postgres, Supabase Auth and row level security",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.117.2",
+    "cors": "^2.8.6",
+    "dotenv": "^18.0.3",
+    "express": "^5.2.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14"
+  }
+}
