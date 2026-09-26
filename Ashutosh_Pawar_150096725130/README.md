@@ -11,6 +11,18 @@ dates first, and a Postgres exclusion constraint rejects any overlap that gets
 past that check. The total cost is `days x daily_rate`, worked out on the
 server. A plain HTML frontend in `public/` is served by the same server.
 
+
+## Live demo
+
+https://assignment-10-car-rental-system-api-et15.onrender.com
+
+The UI and the API run as one Render web service on the free tier, with the
+database and auth in Supabase. The first visit after a period of inactivity can
+take up to a minute while the server wakes up. Deployed with root directory
+`Ashutosh_Pawar_150096725130`, build `npm install`, start `npm start`, and
+`SUPABASE_URL` plus `SUPABASE_ANON_KEY` (the publishable key, so row level
+security still applies) set in the Render environment.
+
 ## Tech stack
 
 - Node.js, Express 5
